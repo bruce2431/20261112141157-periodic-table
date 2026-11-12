@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>元素周期表 · 化学性质色度/深度交互可视化</title>
+  <style>
+:root {
+  --bg: #0b101e;
+  --panel: #131b2e;
+  --panel-2: #19233c;
+  --border: rgba(148, 163, 184, 0.18);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --cell-empty: #161f33;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+body.light {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --panel-2: #eef2f9;
+  --border: rgba(15, 23, 42, 0.12);
+  --text: #0f172a;
+  --muted: #475569;
+  --accent: #0284c7;
+  --cell-empty: #e2e8f0;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 18px 22px 32px;
+  transition: background 0.25s, color 0.25s;
+}
+.container { max-width: 1520px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 20px;
+  box-shadow: var(--shadow);
+}
+.title-wrap h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.4px; display: flex; align-items: center; gap: 10px; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(56,189,248,0.16); color: var(--accent); border: 1px solid rgba(56,189,248,0.35); }
+.title-wrap p { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.toolbar {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px;
+  box-shadow: var(--shadow);
+}
+@media (max-width: 1100px) { .toolbar { grid-template-columns: 1fr; } }
+.control-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ctrl-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.seg-group { display: inline-flex; flex-wrap: wrap; background: var(--panel-2); padding: 3px; border-radius: 10px; border: 1px solid var(--border); gap: 3px; }
+.btn {
+  border: none; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 500;
+  padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: all 0.16s; white-space: nowrap;
+}
+.btn:hover { color: var(--text); background: rgba(148,163,184,0.12); }
+.btn.active { background: var(--accent); color: #06121e; font-weight: 700; box-shadow: 0 2px 8px rgba(56,189,248,0.35); }
+body.light .btn.active { color: #ffffff; }
+select.ctrl-select, input.ctrl-search {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: 12.5px; outline: none;
+}
+.legend-bar-wrap {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 20px;
+  display: grid; grid-template-columns: 240px 1fr 230px; align-items: center; gap: 18px; box-shadow: var(--shadow);
+}
+@media (max-width: 980px) { .legend-bar-wrap { grid-template-columns: 1fr; } }
+.prop-meta .prop-name { font-size: 15px; font-weight: 700; }
+.prop-meta .prop-desc { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.grad-box { position: relative; padding: 6px 0 18px; }
+.grad-track { height: 16px; border-radius: 8px; border: 1px solid var(--border); width: 100%; position: relative; }
+.grad-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
+.grad-pointer {
+  position: absolute; top: 1px; width: 3px; height: 26px; background: #fff;
+  border: 1px solid #000; border-radius: 2px; transform: translateX(-50%); pointer-events: none;
+  opacity: 0; transition: left 0.1s ease-out, opacity 0.15s; z-index: 5;
+}
+.grad-pointer span {
+  position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+  background: #0f172a; color: #fff; font-size: 10.5px; padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+}
+
+.main-stage { display: grid; grid-template-columns: 1fr 330px; gap: 16px; align-items: start; }
+@media (max-width: 1280px) { .main-stage { grid-template-columns: 1fr; } }
+.board-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+  padding: 18px 16px 20px; box-shadow: var(--shadow); overflow-x: auto;
+}
+.pt-perspective { transition: transform 0.4s cubic-bezier(.2,.8,.2,1); }
+.pt-perspective.relief-3d {
+  transform: perspective(1400px) rotateX(22deg) scale(0.97);
+  transform-style: preserve-3d;
+  padding-top: 14px; padding-bottom: 10px;
+}
+.pt-grid {
+  display: grid;
+  grid-template-columns: 26px repeat(18, minmax(48px, 1fr));
+  grid-template-rows: 22px repeat(7, 64px) 14px repeat(2, 62px);
+  gap: 5px;
+  min-width: 980px;
+  transform-style: preserve-3d;
+}
+.axis-lbl {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: var(--muted); user-select: none;
+}
+.f-slot {
+  border: 1px dashed var(--border); border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 10.5px; color: var(--muted); background: rgba(148,163,184,0.04); cursor: pointer;
+}
+.f-slot:hover { border-color: var(--accent); color: var(--accent); }
+.el-cell {
+  position: relative; border-radius: 8px; padding: 4px 5px;
+  border: 1px solid rgba(255,255,255,0.14);
+  display: flex; flex-direction: column; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s, background 0.25s;
+  overflow: hidden;
+}
+body.light .el-cell { border-color: rgba(15,23,42,0.13); }
+.el-cell:hover, .el-cell.selected {
+  z-index: 20;
+  transform: translateY(-4px) scale(1.09) !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.5), 0 0 0 2px #fff !important;
+}
+body.light .el-cell:hover, body.light .el-cell.selected {
+  box-shadow: 0 10px 20px rgba(15,23,42,0.25), 0 0 0 2px #0f172a !important;
+}
+.el-cell.dimmed { opacity: 0.18; filter: grayscale(0.7); }
+.el-cell.no-data {
+  background: repeating-linear-gradient(-45deg, var(--cell-empty), var(--cell-empty) 5px, rgba(148,163,184,0.09) 5px, rgba(148,163,184,0.09) 10px) !important;
+}
+.el-top { display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; line-height: 1; opacity: 0.88; font-variant-numeric: tabular-nums; }
+.el-mid { display: flex; align-items: baseline; justify-content: center; gap: 3px; margin: 1px 0; }
+.el-sym { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.05; }
+.el-zh { font-size: 11px; font-weight: 600; opacity: 0.92; }
+.el-val { font-size: 9.5px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.depth-fill-bar {
+  position: absolute; left: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.75);
+  transition: width 0.25s ease; pointer-events: none;
+}
+.detail-panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+  padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px;
+}
+.hero-box {
+  display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 12px;
+  background: var(--panel-2); border: 1px solid var(--border);
+}
+.hero-tile {
+  width: 66px; height: 72px; border-radius: 10px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.22);
+}
+.hero-tile .hz { font-size: 11px; opacity: 0.85; }
+.hero-tile .hsym { font-size: 24px; line-height: 1.1; }
+.hero-tile .hzh { font-size: 12px; }
+.prop-list { display: flex; flex-direction: column; gap: 7px; }
+.prop-item {
+  display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 8px;
+  font-size: 12px; padding: 5px 8px; border-radius: 7px; background: var(--panel-2); cursor: pointer;
+  border: 1px solid transparent;
+}
+.prop-item.active-prop { border-color: var(--accent); background: rgba(56,189,248,0.1); }
+.prop-bar-bg { height: 6px; background: rgba(148,163,184,0.18); border-radius: 99px; overflow: hidden; }
+.prop-bar-fg { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.25s; }
+.trend-box { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.trend-title { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+svg.spark { width: 100%; height: 68px; overflow: visible; display: block; }
+
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-wrap">
+        <h1>元素周期表 · 性质色度 / 深度表征系统 <span class="badge">118 Elements · IUPAC</span></h1>
+        <p>支持电负性、第一电离能、原子质量、原子半径等 8 项基础化学性质的多光谱色度图、单色明暗深度图与 2.5D 立体高度浮雕切换</p>
+      </div>
+      <div class="control-row">
+        <input id="searchBox" class="ctrl-search" type="text" placeholder="搜索符号 / 中文名 / 英文 / 序数..." />
+        <select id="catFilter" class="ctrl-select"></select>
+        <button id="btnTheme" class="btn" style="border:1px solid var(--border)">浅色界面</button>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <div class="control-row">
+        <span class="ctrl-label">表征性质</span>
+        <div id="propBtns" class="seg-group"></div>
+      </div>
+      <div class="control-row">
+        <span class="ctrl-label">表征模式</span>
+        <div class="seg-group">
+          <button class="btn active" data-mode-btn="chroma">色度图 (色相光谱)</button>
+          <button class="btn" data-mode-btn="depth">深度图 (明暗色深)</button>
+          <button class="btn" data-mode-btn="dual">色度+立体深度</button>
+          <button class="btn" data-mode-btn="cat">元素分族</button>
+        </div>
+        <select id="chromaSelect" class="ctrl-select"></select>
+        <select id="depthSelect" class="ctrl-select" style="display:none"></select>
+        <div class="seg-group">
+          <button class="btn active" data-scale-btn="linear">线性映射</button>
+          <button class="btn" data-scale-btn="log">对数映射</button>
+        </div>
+        <button id="btnRelief" class="btn" style="border:1px solid var(--border)">2.5D 浮雕高度</button>
+        <button id="btnInvert" class="btn" style="border:1px solid var(--border)">反转高低方向</button>
+      </div>
+    </section>
+
+    <section class="legend-bar-wrap">
+      <div class="prop-meta">
+        <div id="propName" class="prop-name">电负性 (Pauling χ)</div>
+        <div id="propDesc" class="prop-desc"></div>
+      </div>
+      <div class="grad-box">
+        <div id="gradTrack" class="grad-track">
+          <div id="gradPointer" class="grad-pointer"><span></span></div>
+        </div>
+        <div id="gradTicks" class="grad-ticks"></div>
+      </div>
+      <div id="statSummary" style="font-size:12px;color:var(--muted);line-height:1.55;text-align:right"></div>
+    </section>
+
+    <main class="main-stage">
+      <div class="board-card">
+        <div id="ptPerspective" class="pt-perspective">
+          <div id="ptGrid" class="pt-grid"></div>
+        </div>
+      </div>
+
+      <aside class="detail-panel">
+        <div class="hero-box">
+          <div id="heroTile" class="hero-tile"></div>
+          <div id="heroInfo"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">全性质对比（点击任意行快速切换表征）</div>
+          <div id="propList" class="prop-list"></div>
+        </div>
+        <div class="trend-box">
+          <div class="trend-title"><span id="periodTrendLbl">同周期递变趋势</span><span>左 → 右</span></div>
+          <svg id="sparkPeriod" class="spark"></svg>
+        </div>
+        <div class="trend-box">
+          <div class="trend-title"><span id="groupTrendLbl">同族递变趋势</span><span>上 → 下</span></div>
+          <svg id="sparkGroup" class="spark"></svg>
+        </div>
+      </aside>
+    </main>
+  </div>
+  <script>
+// [Z, sym, zh, en, cat, row, col, mass(u), eneg(Pauling), ie1(kJ/mol), radius(pm), ea(kJ/mol), mp(K), bp(K), dens(g/cm3)]
+const DATA_1 = [
+[1,"H","氢","Hydrogen",0,1,1,1.008,2.20,1312.0,31,72.8,13.99,20.27,0.0000899],
+[2,"He","氦","Helium",1,1,18,4.0026,null,2372.3,28,0,0.95,4.22,0.0001785],
+[3,"Li","锂","Lithium",2,2,1,6.94,0.98,520.2,128,59.6,453.65,1603,0.534],
+[4,"Be","铍","Beryllium",3,2,2,9.0122,1.57,899.5,96,0,1560,2742,1.85],
+[5,"B","硼","Boron",4,2,13,10.81,2.04,800.6,84,26.7,2349,4200,2.34],
+[6,"C","碳","Carbon",0,2,14,12.011,2.55,1086.5,76,121.8,3800,4300,2.267],
+[7,"N","氮","Nitrogen",0,2,15,14.007,3.04,1402.3,71,-7,63.15,77.36,0.001251],
+[8,"O","氧","Oxygen",0,2,16,15.999,3.44,1313.9,66,141.0,54.36,90.19,0.001429],
+[9,"F","氟","Fluorine",5,2,17,18.998,3.98,1681.0,57,328.0,53.48,85.03,0.001696],
+[10,"Ne","氖","Neon",1,2,18,20.180,null,2080.7,58,0,24.56,27.07,0.0009002],
+[11,"Na","钠","Sodium",2,3,1,22.990,0.93,495.8,166,52.8,370.94,1156,0.968],
+[12,"Mg","镁","Magnesium",3,3,2,24.305,1.31,737.7,141,0,923,1363,1.738],
+[13,"Al","铝","Aluminium",7,3,13,26.982,1.61,577.5,121,41.8,933.47,2792,2.70],
+[14,"Si","硅","Silicon",4,3,14,28.085,1.90,786.5,111,134.1,1687,3538,2.329],
+[15,"P","磷","Phosphorus",0,3,15,30.974,2.19,1011.8,107,72.0,317.3,553.7,1.823],
+[16,"S","硫","Sulfur",0,3,16,32.06,2.58,999.6,105,200.4,388.36,717.8,2.07],
+[17,"Cl","氯","Chlorine",5,3,17,35.45,3.16,1251.2,102,349.0,171.6,239.11,0.003214],
+[18,"Ar","氩","Argon",1,3,18,39.948,null,1520.6,106,0,83.81,87.30,0.001784],
+[19,"K","钾","Potassium",2,4,1,39.098,0.82,418.8,203,48.4,336.7,1032,0.862],
+[20,"Ca","钙","Calcium",3,4,2,40.078,1.00,589.8,176,2.37,1115,1757,1.55],
+[21,"Sc","钪","Scandium",6,4,3,44.956,1.36,633.1,170,18.1,1814,3109,2.985],
+[22,"Ti","钛","Titanium",6,4,4,47.867,1.54,658.8,160,7.6,1941,3560,4.506],
+[23,"V","钒","Vanadium",6,4,5,50.942,1.63,650.9,153,50.6,2183,3680,6.11],
+[24,"Cr","铬","Chromium",6,4,6,51.996,1.66,652.9,139,64.3,2180,2944,7.19],
+[25,"Mn","锰","Manganese",6,4,7,54.938,1.55,717.3,139,0,1519,2334,7.21],
+[26,"Fe","铁","Iron",6,4,8,55.845,1.83,762.5,132,15.7,1811,3134,7.874],
+[27,"Co","钴","Cobalt",6,4,9,58.933,1.88,760.4,126,63.7,1768,3200,8.90],
+[28,"Ni","镍","Nickel",6,4,10,58.693,1.91,737.1,124,112.0,1728,3186,8.908],
+[29,"Cu","铜","Copper",6,4,11,63.546,1.90,745.5,132,118.4,1357.77,2835,8.96],
+[30,"Zn","锌","Zinc",6,4,12,65.38,1.65,906.4,122,0,692.68,1180,7.14],
+[31,"Ga","镓","Gallium",7,4,13,69.723,1.81,578.8,122,28.9,302.91,2673,5.91],
+[32,"Ge","锗","Germanium",4,4,14,72.630,2.01,762.0,120,119.0,1211.4,3106,5.323],
+[33,"As","砷","Arsenic",4,4,15,74.922,2.18,947.0,119,78.0,1090,887,5.727],
+[34,"Se","硒","Selenium",0,4,16,78.971,2.55,941.0,120,195.0,494,958,4.81],
+[35,"Br","溴","Bromine",5,4,17,79.904,2.96,1139.9,120,324.6,265.8,332.0,3.1028],
+[36,"Kr","氪","Krypton",1,4,18,83.798,3.00,1350.8,116,0,115.78,119.93,0.003749],
+[37,"Rb","铷","Rubidium",2,5,1,85.468,0.82,403.0,220,46.9,312.45,961,1.532],
+[38,"Sr","锶","Strontium",3,5,2,87.62,0.95,549.5,195,5.03,1050,1655,2.64],
+[39,"Y","钇","Yttrium",6,5,3,88.906,1.22,600.0,190,29.6,1799,3609,4.472],
+[40,"Zr","锆","Zirconium",6,5,4,91.224,1.33,640.1,175,41.1,2128,4682,6.52],
+[41,"Nb","铌","Niobium",6,5,5,92.906,1.60,652.1,164,86.1,2750,5017,8.57],
+[42,"Mo","钼","Molybdenum",6,5,6,95.95,2.16,684.3,154,71.9,2896,4912,10.28],
+[43,"Tc","锝","Technetium",6,5,7,98,1.90,702.0,147,53.0,2430,4538,11.0],
+[44,"Ru","钌","Ruthenium",6,5,8,101.07,2.20,710.2,146,101.3,2607,4423,12.45],
+[45,"Rh","铑","Rhodium",6,5,9,102.91,2.28,719.7,142,109.7,2237,3968,12.41],
+[46,"Pd","钯","Palladium",6,5,10,106.42,2.20,804.4,139,53.7,1828.05,3236,12.023],
+[47,"Ag","银","Silver",6,5,11,107.87,1.93,731.0,145,125.6,1234.93,2435,10.49],
+[48,"Cd","镉","Cadmium",6,5,12,112.41,1.69,867.8,144,0,594.22,1040,8.65],
+[49,"In","铟","Indium",7,5,13,114.82,1.78,558.3,142,28.9,429.75,2345,7.31],
+[50,"Sn","锡","Tin",7,5,14,118.71,1.96,708.6,139,107.3,505.08,2875,7.31],
+[51,"Sb","锑","Antimony",4,5,15,121.76,2.05,834.0,139,103.2,903.78,1860,6.697],
+[52,"Te","碲","Tellurium",4,5,16,127.60,2.10,869.3,138,190.2,722.66,1261,6.24],
+[53,"I","碘","Iodine",5,5,17,126.90,2.66,1008.4,139,295.2,386.85,457.4,4.933],
+[54,"Xe","氙","Xenon",1,5,18,131.29,2.60,1170.4,140,0,161.4,165.05,0.005894],
+[55,"Cs","铯","Caesium",2,6,1,132.91,0.79,375.7,244,45.5,301.7,944,1.93],
+[56,"Ba","钡","Barium",3,6,2,137.33,0.89,502.9,215,13.95,1000,2170,3.51],
+[57,"La","镧","Lanthanum",8,9,4,138.91,1.10,538.1,207,48.0,1193,3737,6.162],
+[58,"Ce","铈","Cerium",8,9,5,140.12,1.12,534.4,204,50.0,1068,3716,6.770],
+[59,"Pr","镨","Praseodymium",8,9,6,140.91,1.13,527.0,203,50.0,1208,3793,6.77],
+[60,"Nd","钕","Neodymium",8,9,7,144.24,1.14,533.1,201,50.0,1297,3347,7.01]
+];
+
+const DATA_2 = [
+[61,"Pm","钷","Promethium",8,9,8,145,1.13,540.0,199,50.0,1315,3273,7.26],
+[62,"Sm","钐","Samarium",8,9,9,150.36,1.17,544.5,198,50.0,1345,2067,7.52],
+[63,"Eu","铕","Europium",8,9,10,151.96,1.20,547.1,198,50.0,1099,1802,5.244],
+[64,"Gd","钆","Gadolinium",8,9,11,157.25,1.20,593.4,196,50.0,1585,3546,7.90],
+[65,"Tb","铽","Terbium",8,9,12,158.93,1.20,565.8,194,50.0,1629,3503,8.23],
+[66,"Dy","镝","Dysprosium",8,9,13,162.50,1.22,573.0,192,50.0,1680,2840,8.54],
+[67,"Ho","钬","Holmium",8,9,14,164.93,1.23,581.0,192,50.0,1734,2993,8.79],
+[68,"Er","铒","Erbium",8,9,15,167.26,1.24,589.3,189,50.0,1802,3141,9.066],
+[69,"Tm","铥","Thulium",8,9,16,168.93,1.25,596.7,190,50.0,1818,2223,9.32],
+[70,"Yb","镱","Ytterbium",8,9,17,173.05,1.10,603.4,187,50.0,1097,1469,6.90],
+[71,"Lu","镥","Lutetium",8,9,18,174.97,1.27,523.5,187,33.4,1925,3675,9.841],
+[72,"Hf","铪","Hafnium",6,6,4,178.49,1.30,658.5,175,0,2506,4876,13.31],
+[73,"Ta","钽","Tantalum",6,6,5,180.95,1.50,761.0,170,31.0,3290,5731,16.69],
+[74,"W","钨","Tungsten",6,6,6,183.84,2.36,770.0,162,78.6,3695,5828,19.25],
+[75,"Re","铼","Rhenium",6,6,7,186.21,1.90,760.0,151,14.5,3459,5869,21.02],
+[76,"Os","锇","Osmium",6,6,8,190.23,2.20,840.0,144,106.1,3306,5285,22.59],
+[77,"Ir","铱","Iridium",6,6,9,192.22,2.20,880.0,141,151.0,2719,4701,22.56],
+[78,"Pt","铂","Platinum",6,6,10,195.08,2.28,870.0,136,205.3,2041.4,4098,21.45],
+[79,"Au","金","Gold",6,6,11,196.97,2.54,890.1,136,222.8,1337.33,3129,19.30],
+[80,"Hg","汞","Mercury",6,6,12,200.59,2.00,1007.1,132,0,234.32,629.88,13.534],
+[81,"Tl","铊","Thallium",7,6,13,204.38,1.62,589.4,145,19.2,577,1746,11.85],
+[82,"Pb","铅","Lead",7,6,14,207.2,2.33,715.6,146,35.1,600.61,2022,11.34],
+[83,"Bi","铋","Bismuth",7,6,15,208.98,2.02,703.0,148,91.2,544.7,1837,9.78],
+[84,"Po","钋","Polonium",4,6,16,209,2.00,812.1,140,183.3,527,1235,9.196],
+[85,"At","砹","Astatine",5,6,17,210,2.20,899.0,150,270.1,575,610,7.0],
+[86,"Rn","氡","Radon",1,6,18,222,2.20,1037.0,150,0,202,211.3,0.00973],
+[87,"Fr","钫","Francium",2,7,1,223,0.70,380.0,260,44.0,300,950,1.87],
+[88,"Ra","镭","Radium",3,7,2,226,0.90,509.3,221,9.65,973,2010,5.5],
+[89,"Ac","锕","Actinium",9,10,4,227,1.10,499.0,215,33.77,1323,3471,10.07],
+[90,"Th","钍","Thorium",9,10,5,232.04,1.30,587.0,206,null,2115,5061,11.72],
+[91,"Pa","镤","Protactinium",9,10,6,231.04,1.50,568.0,200,null,1841,4300,15.37],
+[92,"U","铀","Uranium",9,10,7,238.03,1.38,597.6,196,null,1405.3,4404,19.1],
+[93,"Np","镎","Neptunium",9,10,8,237,1.36,604.5,190,null,917,4273,20.45],
+[94,"Pu","钚","Plutonium",9,10,9,244,1.28,584.7,187,null,912.5,3501,19.85],
+[95,"Am","镅","Americium",9,10,10,243,1.13,578.0,180,null,1449,2880,12.0],
+[96,"Cm","锔","Curium",9,10,11,247,1.28,581.0,169,null,1613,3383,13.51],
+[97,"Bk","锫","Berkelium",9,10,12,247,1.30,601.0,168,null,1259,2900,14.78],
+[98,"Cf","锎","Californium",9,10,13,251,1.30,608.0,168,null,1173,1743,15.1],
+[99,"Es","锿","Einsteinium",9,10,14,252,1.30,619.0,165,null,1133,1269,8.84],
+[100,"Fm","镄","Fermium",9,10,15,257,1.30,627.0,167,null,1800,null,9.7],
+[101,"Md","钔","Mendelevium",9,10,16,258,1.30,635.0,173,null,1100,null,10.3],
+[102,"No","锘","Nobelium",9,10,17,259,1.30,642.0,176,null,1100,null,9.9],
+[103,"Lr","铹","Lawrencium",9,10,18,266,1.30,470.0,161,null,1900,null,15.6],
+[104,"Rf","𬬻","Rutherfordium",6,7,4,267,null,580.0,157,null,2400,5800,23.2],
+[105,"Db","𬭊","Dubnium",6,7,5,268,null,665.0,149,null,null,null,29.3],
+[106,"Sg","𬭳","Seaborgium",6,7,6,269,null,757.0,143,null,null,null,35.0],
+[107,"Bh","𬭛","Bohrium",6,7,7,270,null,740.0,141,null,null,null,37.1],
+[108,"Hs","𬭶","Hassium",6,7,8,277,null,730.0,134,null,null,null,40.7],
+[109,"Mt","鿏","Meitnerium",6,7,9,278,null,800.0,129,null,null,null,37.4],
+[110,"Ds","𫟼","Darmstadtium",6,7,10,281,null,960.0,128,null,null,null,34.8],
+[111,"Rg","𬬭","Roentgenium",6,7,11,282,null,1020.0,121,null,null,null,28.7],
+[112,"Cn","鎶","Copernicium",6,7,12,285,null,1155.0,122,null,283,340,14.0],
+[113,"Nh","鉨","Nihonium",7,7,13,286,null,704.9,136,null,700,1400,16.0],
+[114,"Fl","𫓧","Flerovium",7,7,14,289,null,823.9,143,null,340,420,14.0],
+[115,"Mc","镆","Moscovium",7,7,15,290,null,538.3,162,null,670,1400,13.5],
+[116,"Lv","𫟷","Livermorium",7,7,16,293,null,723.6,175,null,709,1085,12.9],
+[117,"Ts","鿬","Tennessine",5,7,17,294,null,743.0,165,null,723,883,7.2],
+[118,"Og","鿫","Oganesson",1,7,18,294,null,839.4,157,null,325,450,5.0]
+];
+
+const PROPS = [
+  { key: "eneg", idx: 8,  name: "电负性",       unit: "Pauling χ", fmt: v => v.toFixed(2), desc: "原子在化合物中吸引成键电子能力的相对大小（鲍林标度）" },
+  { key: "ie1",  idx: 9,  name: "第一电离能",   unit: "kJ/mol",    fmt: v => v.toFixed(1), desc: "气态基态原子失去第一个电子转化为气态正离子所需的最低能量" },
+  { key: "mass", idx: 7,  name: "原子质量",     unit: "u",         fmt: v => v < 10 ? v.toFixed(3) : v.toFixed(2), desc: "IUPAC 标准相对原子质量（放射性元素取最长寿同位素质量数）" },
+  { key: "rad",  idx: 10, name: "原子半径",     unit: "pm",        fmt: v => Math.round(v) + "", desc: "经验/共价单键原子半径（皮米 pm），反映原子电子云空间尺度" },
+  { key: "ea",   idx: 11, name: "电子亲和能",   unit: "kJ/mol",    fmt: v => v.toFixed(1), desc: "气态原子获得一个电子形成气态负离子时释放的能量" },
+  { key: "mp",   idx: 12, name: "熔点",         unit: "K",         fmt: v => v < 100 ? v.toFixed(2) : Math.round(v) + "", desc: "标准大气压下纯元素固相与液相平衡热力学温度" },
+  { key: "bp",   idx: 13, name: "沸点",         unit: "K",         fmt: v => v < 100 ? v.toFixed(2) : Math.round(v) + "", desc: "标准大气压下纯元素液相转变为气相的沸腾温度" },
+  { key: "dens", idx: 14, name: "密度",         unit: "g/cm³",     fmt: v => v < 0.1 ? v.toExponential(2) : v.toFixed(2), desc: "标准状况（298 K, 1 atm）下元素单质的体相质量密度" }
+];
+
+const CATS = [
+  { name: "活泼非金属", color: "#22c55e" },
+  { name: "稀有气体",   color: "#a855f7" },
+  { name: "碱金属",     color: "#ef4444" },
+  { name: "碱土金属",   color: "#f97316" },
+  { name: "类金属",     color: "#14b8a6" },
+  { name: "卤素",       color: "#eab308" },
+  { name: "过渡金属",   color: "#3b82f6" },
+  { name: "后过渡金属", color: "#06b6d4" },
+  { name: "镧系元素",   color: "#ec4899" },
+  { name: "锕系元素",   color: "#f43f5e" }
+];
+
+const CHROMA_MAPS = {
+  turbo: {
+    label: "光谱色度 (Turbo)",
+    stops: [[48,18,59],[70,107,227],[40,188,235],[50,242,152],[164,252,60],[238,207,58],[251,126,33],[208,47,5],[122,4,3]]
+  },
+  viridis: {
+    label: "均匀感知色度 (Viridis)",
+    stops: [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]]
+  },
+  plasma: {
+    label: "等离子色度 (Plasma)",
+    stops: [[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]]
+  },
+  coolwarm: {
+    label: "冷暖双极色度 (Cool-Warm)",
+    stops: [[30,64,175],[56,189,248],[226,232,240],[251,146,60],[185,28,28]]
+  }
+};
+
+const DEPTH_MAPS = {
+  cyan:    { label: "深海青深度", stopsDark: [[12,26,44],[14,78,118],[6,148,198],[125,236,255]], stopsLight: [[230,247,255],[138,212,248],[14,132,196],[8,51,88]] },
+  emerald: { label: "翡翠绿深度", stopsDark: [[11,32,26],[13,92,66],[16,172,116],[134,250,198]], stopsLight: [[232,250,240],[134,228,178],[16,148,96],[6,64,43]] },
+  amber:   { label: "琥珀金深度", stopsDark: [[36,22,10],[112,58,12],[210,122,16],[254,228,118]], stopsLight: [[254,249,226],[252,205,112],[217,119,6],[110,44,6]] },
+  violet:  { label: "紫晶深度",   stopsDark: [[28,16,46],[86,40,145],[152,82,235],[230,198,255]], stopsLight: [[245,238,255],[196,164,250],[126,58,218],[54,18,108]] },
+  mono:    { label: "纯粹灰阶深度", stopsDark: [[22,28,40],[72,85,106],[148,163,184],[241,245,249]], stopsLight: [[244,247,251],[182,194,210],[92,106,128],[18,24,38]] }
+};
+
+function interpStops(stops, t) {
+  const c = Math.max(0, Math.min(1, t));
+  const pos = c * (stops.length - 1);
+  const i = Math.floor(pos);
+  const f = pos - i;
+  if (i >= stops.length - 1) return stops[stops.length - 1];
+  const a = stops[i], b = stops[i + 1];
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * f),
+    Math.round(a[1] + (b[1] - a[1]) * f),
+    Math.round(a[2] + (b[2] - a[2]) * f)
+  ];
+}
+
+function rgbStr(rgb) { return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; }
+
+function textContrast(rgb) {
+  const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  return lum > 0.56 ? "#08111f" : "#f8fafc";
+}
+
+const ELEMENTS = [...DATA_1, ...DATA_2].map(r => ({
+  z: r[0], sym: r[1], zh: r[2], en: r[3], cat: r[4], row: r[5], col: r[6], raw: r
+}));
+const EL_BY_Z = Object.fromEntries(ELEMENTS.map(e => [e.z, e]));
+
+const state = {
+  propKey: "eneg",
+  mode: "chroma",      // "chroma" | "depth" | "dual" | "cat"
+  chromaMap: "turbo",
+  depthMap: "cyan",
+  invert: false,
+  relief3d: false,
+  scale: "linear",     // "linear" | "log"
+  selectedZ: 9,
+  filterCat: -1,
+  query: "",
+  light: false
+};
+
+function currentProp() { return PROPS.find(p => p.key === state.propKey); }
+
+function getStats(prop) {
+  const vals = ELEMENTS.map(e => e.raw[prop.idx]).filter(v => v !== null && v !== undefined && !Number.isNaN(v));
+  const posVals = vals.filter(v => v > 0);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const logMin = posVals.length ? Math.min(...posVals) : 1e-4;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  return { min, max, logMin, med, count: vals.length };
+}
+
+function normVal(val, stats) {
+  if (val === null || val === undefined) return null;
+  let t;
+  if (state.scale === "log") {
+    const safeV = Math.max(val, stats.logMin);
+    const a = Math.log10(stats.logMin), b = Math.log10(Math.max(stats.max, stats.logMin * 10));
+    t = b === a ? 0.5 : (Math.log10(safeV) - a) / (b - a);
+  } else {
+    t = stats.max === stats.min ? 0.5 : (val - stats.min) / (stats.max - stats.min);
+  }
+  t = Math.max(0, Math.min(1, t));
+  return state.invert ? 1 - t : t;
+}
+
+function colorForT(t) {
+  if (state.mode === "depth") {
+    const dm = DEPTH_MAPS[state.depthMap];
+    return interpStops(state.light ? dm.stopsLight : dm.stopsDark, t);
+  }
+  return interpStops(CHROMA_MAPS[state.chromaMap].stops, t);
+}
+
+const cellDom = {};
+
+function buildGrid() {
+  const grid = document.getElementById("ptGrid");
+  grid.innerHTML = "";
+  for (let c = 1; c <= 18; c++) {
+    const d = document.createElement("div");
+    d.className = "axis-lbl";
+    d.style.gridRow = "1"; d.style.gridColumn = String(c + 1);
+    d.textContent = c;
+    grid.appendChild(d);
+  }
+  for (let r = 1; r <= 7; r++) {
+    const d = document.createElement("div");
+    d.className = "axis-lbl";
+    d.style.gridRow = String(r + 1); d.style.gridColumn = "1";
+    d.textContent = r;
+    grid.appendChild(d);
+  }
+  const fLabels = [{ row: 9, txt: "镧系" }, { row: 10, txt: "锕系" }];
+  fLabels.forEach(fl => {
+    const d = document.createElement("div");
+    d.className = "axis-lbl";
+    d.style.gridRow = String(fl.row + 1); d.style.gridColumn = "1 / 4";
+    d.textContent = fl.txt;
+    grid.appendChild(d);
+  });
+  const slots = [
+    { r: 6, c: 3, label: "57-71", sub: "La-Lu", cat: 8 },
+    { r: 7, c: 3, label: "89-103", sub: "Ac-Lr", cat: 9 }
+  ];
+  slots.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "f-slot";
+    d.style.gridRow = String(s.r + 1); d.style.gridColumn = String(s.c + 1);
+    d.innerHTML = `<strong>${s.label}</strong><span>${s.sub}</span>`;
+    d.onclick = () => { state.filterCat = state.filterCat === s.cat ? -1 : s.cat; renderAll(); };
+    grid.appendChild(d);
+  });
+  ELEMENTS.forEach(el => {
+    const cell = document.createElement("div");
+    cell.className = "el-cell";
+    cell.style.gridRow = String(el.row + 1);
+    cell.style.gridColumn = String(el.col + 1);
+    cell.innerHTML = `
+      <div class="el-top"><span>${el.z}</span><span class="el-cat-dot"></span></div>
+      <div class="el-mid"><span class="el-sym">${el.sym}</span><span class="el-zh">${el.zh}</span></div>
+      <div class="el-val">--</div>
+      <div class="depth-fill-bar" style="width:0%"></div>`;
+    cell.addEventListener("mouseenter", () => onHoverElement(el));
+    cell.addEventListener("mouseleave", () => hideLegendPointer());
+    cell.addEventListener("click", () => { state.selectedZ = el.z; renderAll(); });
+    grid.appendChild(cell);
+    cellDom[el.z] = cell;
+  });
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function renderAll() {
+  const prop = currentProp();
+  const stats = getStats(prop);
+  const use3d = state.relief3d || state.mode === "dual";
+  document.getElementById("ptPerspective").classList.toggle("relief-3d", use3d);
+
+  const q = state.query.trim().toLowerCase();
+  ELEMENTS.forEach(el => {
+    const cell = cellDom[el.z];
+    const val = el.raw[prop.idx];
+    const t = normVal(val, stats);
+    const valNode = cell.querySelector(".el-val");
+    const barNode = cell.querySelector(".depth-fill-bar");
+
+    const matchQ = !q || el.sym.toLowerCase().includes(q) || el.zh.includes(q) || el.en.toLowerCase().includes(q) || String(el.z) === q;
+    const matchCat = state.filterCat === -1 || el.cat === state.filterCat;
+    cell.classList.toggle("dimmed", !(matchQ && matchCat));
+    cell.classList.toggle("selected", el.z === state.selectedZ);
+
+    if (state.mode === "cat") {
+      cell.classList.remove("no-data");
+      const rgb = hexToRgb(CATS[el.cat].color);
+      cell.style.background = rgbStr(rgb);
+      cell.style.color = textContrast(rgb);
+      cell.style.transform = "";
+      cell.style.boxShadow = "";
+      valNode.textContent = val !== null ? prop.fmt(val) : "—";
+      barNode.style.width = "0%";
+      return;
+    }
+
+    if (t === null) {
+      cell.classList.add("no-data");
+      cell.style.background = "";
+      cell.style.color = "var(--muted)";
+      cell.style.transform = "";
+      cell.style.boxShadow = "";
+      valNode.textContent = "暂无";
+      barNode.style.width = "0%";
+    } else {
+      cell.classList.remove("no-data");
+      const rgb = colorForT(t);
+      cell.style.background = rgbStr(rgb);
+      cell.style.color = textContrast(rgb);
+      valNode.textContent = prop.fmt(val);
+      barNode.style.width = state.mode === "depth" ? `${Math.round(t * 100)}%` : "0%";
+      if (use3d) {
+        const zLift = Math.round(t * 28);
+        const shade = `rgb(${Math.max(0,rgb[0]-55)},${Math.max(0,rgb[1]-55)},${Math.max(0,rgb[2]-55)})`;
+        cell.style.transform = `translateZ(${zLift}px) translateY(${-Math.round(t * 6)}px)`;
+        cell.style.boxShadow = `0 ${Math.max(2, Math.round(t * 9))}px 0 ${shade}, 0 ${Math.round(t * 16 + 4)}px 14px rgba(0,0,0,0.42)`;
+      } else {
+        cell.style.transform = "";
+        cell.style.boxShadow = "";
+      }
+    }
+  });
+
+  renderLegend(prop, stats);
+  renderDetail(EL_BY_Z[state.selectedZ], prop, stats);
+  syncToolbarUI();
+}
+
+function renderLegend(prop, stats) {
+  document.getElementById("propName").textContent = `${prop.name} (${prop.unit})`;
+  document.getElementById("propDesc").textContent = prop.desc;
+  const track = document.getElementById("gradTrack");
+  const ticks = document.getElementById("gradTicks");
+  if (state.mode === "cat") {
+    track.style.background = `linear-gradient(90deg, ${CATS.map(c => c.color).join(",")})`;
+    ticks.innerHTML = `<span>元素化学族分类着色模式（点击右侧图例可筛选单族）</span>`;
+    document.getElementById("statSummary").innerHTML = `有效数据：<strong>${stats.count}</strong> / 118 元素`;
+    return;
+  }
+  const samples = [];
+  for (let i = 0; i <= 20; i++) samples.push(rgbStr(colorForT(i / 20)));
+  track.style.background = `linear-gradient(90deg, ${samples.join(",")})`;
+  const tickVals = [0, 0.25, 0.5, 0.75, 1].map(p => {
+    const tp = state.invert ? 1 - p : p;
+    if (state.scale === "log") {
+      const a = Math.log10(stats.logMin), b = Math.log10(Math.max(stats.max, stats.logMin * 10));
+      return prop.fmt(Math.pow(10, a + tp * (b - a)));
+    }
+    return prop.fmt(stats.min + tp * (stats.max - stats.min));
+  });
+  ticks.innerHTML = tickVals.map(v => `<span>${v}</span>`).join("");
+  document.getElementById("statSummary").innerHTML =
+    `范围：<strong>${prop.fmt(stats.min)}</strong> ~ <strong>${prop.fmt(stats.max)}</strong> ${prop.unit}<br>中位数：<strong>${prop.fmt(stats.med)}</strong> · 有效值 ${stats.count}/118`;
+}
+
+function onHoverElement(el) {
+  const prop = currentProp();
+  const stats = getStats(prop);
+  const val = el.raw[prop.idx];
+  const ptr = document.getElementById("gradPointer");
+  if (val !== null && state.mode !== "cat") {
+    const t = normVal(val, stats);
+    ptr.style.left = `${(t * 100).toFixed(1)}%`;
+    ptr.style.opacity = "1";
+    ptr.querySelector("span").textContent = `${el.sym} ${prop.fmt(val)}`;
+  } else {
+    ptr.style.opacity = "0";
+  }
+  renderDetail(el, prop, stats);
+}
+
+function hideLegendPointer() {
+  document.getElementById("gradPointer").style.opacity = "0";
+  const prop = currentProp();
+  renderDetail(EL_BY_Z[state.selectedZ], prop, getStats(prop));
+}
+
+function drawSparkline(svgId, list, activeZ, prop) {
+  const svg = document.getElementById(svgId);
+  const pts = list.filter(e => e.raw[prop.idx] !== null);
+  if (pts.length < 2) {
+    svg.innerHTML = `<text x="50%" y="38" text-anchor="middle" fill="var(--muted)" font-size="11">有效数据点不足</text>`;
+    return;
+  }
+  const vals = pts.map(e => e.raw[prop.idx]);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const W = 280, H = 62, padX = 12, padY = 10;
+  const coords = pts.map((e, i) => {
+    const x = padX + (i / (pts.length - 1)) * (W - padX * 2);
+    const ratio = max === min ? 0.5 : (e.raw[prop.idx] - min) / (max - min);
+    const y = H - padY - ratio * (H - padY * 2);
+    return { e, x, y };
+  });
+  const poly = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const circles = coords.map(c => {
+    const isCur = c.e.z === activeZ;
+    return `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${isCur ? 4.5 : 2.4}" fill="${isCur ? "#facc15" : "var(--accent)"}" stroke="${isCur ? "#000" : "none"}" stroke-width="1"/>` +
+           (isCur ? `<text x="${c.x.toFixed(1)}" y="${Math.max(10, c.y - 7).toFixed(1)}" text-anchor="middle" fill="var(--text)" font-size="9.5" font-weight="700">${c.e.sym}</text>` : "");
+  }).join("");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = `<polyline fill="none" stroke="var(--accent)" stroke-width="1.8" points="${poly}" opacity="0.85"/>${circles}`;
+}
+
+function renderDetail(el, activeProp, activeStats) {
+  const tile = document.getElementById("heroTile");
+  const val = el.raw[activeProp.idx];
+  const t = normVal(val, activeStats);
+  if (state.mode === "cat" || t === null) {
+    const rgb = hexToRgb(CATS[el.cat].color);
+    tile.style.background = rgbStr(rgb);
+    tile.style.color = textContrast(rgb);
+  } else {
+    const rgb = colorForT(t);
+    tile.style.background = rgbStr(rgb);
+    tile.style.color = textContrast(rgb);
+  }
+  tile.innerHTML = `<span class="hz">${el.z}</span><span class="hsym">${el.sym}</span><span class="hzh">${el.zh}</span>`;
+  const periodNum = el.row === 9 ? 6 : (el.row === 10 ? 7 : el.row);
+  const groupTxt = el.row >= 9 ? (el.row === 9 ? "镧系 (f区)" : "锕系 (f区)") : `第 ${el.col} 族`;
+  document.getElementById("heroInfo").innerHTML = `
+    <div style="font-size:15px;font-weight:700">${el.zh} · ${el.en}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">${CATS[el.cat].name} ｜ 第 ${periodNum} 周期 · ${groupTxt}</div>
+    <div style="font-size:12px;margin-top:5px;color:var(--accent);font-weight:600">当前 ${activeProp.name}：${val !== null ? activeProp.fmt(val) + " " + activeProp.unit : "暂无实验测定值"}</div>`;
+
+  const listNode = document.getElementById("propList");
+  listNode.innerHTML = PROPS.map(p => {
+    const st = getStats(p);
+    const v = el.raw[p.idx];
+    const ratio = v !== null ? Math.max(4, Math.round(((v - st.min) / (st.max - st.min || 1)) * 100)) : 0;
+    return `<div class="prop-item ${p.key === state.propKey ? "active-prop" : ""}" data-prop="${p.key}">
+      <span>${p.name}</span>
+      <div class="prop-bar-bg"><div class="prop-bar-fg" style="width:${ratio}%"></div></div>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600">${v !== null ? p.fmt(v) + " " + p.unit : "—"}</span>
+    </div>`;
+  }).join("");
+  listNode.querySelectorAll(".prop-item").forEach(n => {
+    n.onclick = () => { state.propKey = n.dataset.prop; renderAll(); };
+  });
+
+  const samePeriod = ELEMENTS.filter(e => (e.row === el.row)).sort((a, b) => a.col - b.col);
+  const sameGroup = el.row >= 9
+    ? ELEMENTS.filter(e => e.col === el.col && e.row >= 9).sort((a, b) => a.row - b.row)
+    : ELEMENTS.filter(e => e.col === el.col && e.row <= 7).sort((a, b) => a.row - b.row);
+  document.getElementById("periodTrendLbl").textContent = el.row >= 9 ? `${el.row === 9 ? "镧系" : "锕系"}递变趋势` : `第 ${periodNum} 周期递变趋势`;
+  document.getElementById("groupTrendLbl").textContent = el.row >= 9 ? "同列f区对比" : `第 ${el.col} 族递变趋势`;
+  drawSparkline("sparkPeriod", samePeriod, el.z, activeProp);
+  drawSparkline("sparkGroup", sameGroup, el.z, activeProp);
+}
+
+function syncToolbarUI() {
+  document.querySelectorAll("[data-prop-btn]").forEach(b => b.classList.toggle("active", b.dataset.propBtn === state.propKey));
+  document.querySelectorAll("[data-mode-btn]").forEach(b => b.classList.toggle("active", b.dataset.modeBtn === state.mode));
+  document.querySelectorAll("[data-scale-btn]").forEach(b => b.classList.toggle("active", b.dataset.scaleBtn === state.scale));
+  document.getElementById("chromaSelect").style.display = (state.mode === "chroma" || state.mode === "dual") ? "" : "none";
+  document.getElementById("depthSelect").style.display = state.mode === "depth" ? "" : "none";
+  document.getElementById("btnRelief").classList.toggle("active", state.relief3d || state.mode === "dual");
+  document.getElementById("btnInvert").classList.toggle("active", state.invert);
+}
+
+function initUI() {
+  const propBar = document.getElementById("propBtns");
+  propBar.innerHTML = PROPS.map(p => `<button class="btn" data-prop-btn="${p.key}">${p.name}</button>`).join("");
+  propBar.querySelectorAll("button").forEach(b => b.onclick = () => { state.propKey = b.dataset.propBtn; renderAll(); });
+
+  document.querySelectorAll("[data-mode-btn]").forEach(b => b.onclick = () => { state.mode = b.dataset.modeBtn; renderAll(); });
+  document.querySelectorAll("[data-scale-btn]").forEach(b => b.onclick = () => { state.scale = b.dataset.scaleBtn; renderAll(); });
+
+  const cs = document.getElementById("chromaSelect");
+  cs.innerHTML = Object.entries(CHROMA_MAPS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  cs.onchange = () => { state.chromaMap = cs.value; renderAll(); };
+
+  const ds = document.getElementById("depthSelect");
+  ds.innerHTML = Object.entries(DEPTH_MAPS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  ds.onchange = () => { state.depthMap = ds.value; renderAll(); };
+
+  const catSel = document.getElementById("catFilter");
+  catSel.innerHTML = `<option value="-1">全部元素族 (118)</option>` + CATS.map((c, i) => `<option value="${i}">${c.name}</option>`).join("");
+  catSel.onchange = () => { state.filterCat = Number(catSel.value); renderAll(); };
+
+  document.getElementById("btnRelief").onclick = () => { state.relief3d = !state.relief3d; renderAll(); };
+  document.getElementById("btnInvert").onclick = () => { state.invert = !state.invert; renderAll(); };
+  document.getElementById("btnTheme").onclick = () => {
+    state.light = !state.light;
+    document.body.classList.toggle("light", state.light);
+    document.getElementById("btnTheme").textContent = state.light ? "深色界面" : "浅色界面";
+    renderAll();
+  };
+  document.getElementById("searchBox").oninput = e => { state.query = e.target.value; renderAll(); };
+
+  buildGrid();
+  renderAll();
+}
+
+window.addEventListener("DOMContentLoaded", initUI);
+
+</script>
+</body>
+</html>

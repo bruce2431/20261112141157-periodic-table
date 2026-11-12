@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>元素周期表 · 化学性质色度/深度交互可视化</title>
+  <!-- __STYLES__ -->
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-wrap">
+        <h1>元素周期表 · 性质色度 / 深度表征系统 <span class="badge">118 Elements · IUPAC</span></h1>
+        <p>支持电负性、第一电离能、原子质量、原子半径等 8 项基础化学性质的多光谱色度图、单色明暗深度图与 2.5D 立体高度浮雕切换</p>
+      </div>
+      <div class="control-row">
+        <input id="searchBox" class="ctrl-search" type="text" placeholder="搜索符号 / 中文名 / 英文 / 序数..." />
+        <select id="catFilter" class="ctrl-select"></select>
+        <button id="btnTheme" class="btn" style="border:1px solid var(--border)">浅色界面</button>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <div class="control-row">
+        <span class="ctrl-label">表征性质</span>
+        <div id="propBtns" class="seg-group"></div>
+      </div>
+      <div class="control-row">
+        <span class="ctrl-label">表征模式</span>
+        <div class="seg-group">
+          <button class="btn active" data-mode-btn="chroma">色度图 (色相光谱)</button>
+          <button class="btn" data-mode-btn="depth">深度图 (明暗色深)</button>
+          <button class="btn" data-mode-btn="dual">色度+立体深度</button>
+          <button class="btn" data-mode-btn="cat">元素分族</button>
+        </div>
+        <select id="chromaSelect" class="ctrl-select"></select>
+        <select id="depthSelect" class="ctrl-select" style="display:none"></select>
+        <div class="seg-group">
+          <button class="btn active" data-scale-btn="linear">线性映射</button>
+          <button class="btn" data-scale-btn="log">对数映射</button>
+        </div>
+        <button id="btnRelief" class="btn" style="border:1px solid var(--border)">2.5D 浮雕高度</button>
+        <button id="btnInvert" class="btn" style="border:1px solid var(--border)">反转高低方向</button>
+      </div>
+    </section>
+
+    <section class="legend-bar-wrap">
+      <div class="prop-meta">
+        <div id="propName" class="prop-name">电负性 (Pauling χ)</div>
+        <div id="propDesc" class="prop-desc"></div>
+      </div>
+      <div class="grad-box">
+        <div id="gradTrack" class="grad-track">
+          <div id="gradPointer" class="grad-pointer"><span></span></div>
+        </div>
+        <div id="gradTicks" class="grad-ticks"></div>
+      </div>
+      <div id="statSummary" style="font-size:12px;color:var(--muted);line-height:1.55;text-align:right"></div>
+    </section>
+
+    <main class="main-stage">
+      <div class="board-card">
+        <div id="ptPerspective" class="pt-perspective">
+          <div id="ptGrid" class="pt-grid"></div>
+        </div>
+      </div>
+
+      <aside class="detail-panel">
+        <div class="hero-box">
+          <div id="heroTile" class="hero-tile"></div>
+          <div id="heroInfo"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">全性质对比（点击任意行快速切换表征）</div>
+          <div id="propList" class="prop-list"></div>
+        </div>
+        <div class="trend-box">
+          <div class="trend-title"><span id="periodTrendLbl">同周期递变趋势</span><span>左 → 右</span></div>
+          <svg id="sparkPeriod" class="spark"></svg>
+        </div>
+        <div class="trend-box">
+          <div class="trend-title"><span id="groupTrendLbl">同族递变趋势</span><span>上 → 下</span></div>
+          <svg id="sparkGroup" class="spark"></svg>
+        </div>
+      </aside>
+    </main>
+  </div>
+  <!-- __SCRIPTS__ -->
+</body>
+</html>
